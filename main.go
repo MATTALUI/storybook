@@ -82,6 +82,7 @@ var (
 	AWS_ACCESS_KEY_ID     string
 	AWS_SECRET_ACCESS_KEY string
 	AWS_REGION            string
+	FINAL_SLIDE_IMAGE     string
 )
 
 func init() {
@@ -95,6 +96,7 @@ func init() {
 	AWS_ACCESS_KEY_ID, err = env.MustGet("AWS_ACCESS_KEY_ID")
 	AWS_SECRET_ACCESS_KEY, err = env.MustGet("AWS_SECRET_ACCESS_KEY")
 	AWS_REGION, err = env.MustGet("AWS_REGION")
+	FINAL_SLIDE_IMAGE, err = env.MustGet("FINAL_SLIDE_IMAGE")
 	if err != nil {
 		panic(err)
 	}
@@ -119,7 +121,7 @@ func main() {
 	fmt.Println()
 	wg.Wait()
 	createSlideShow(story)
-	fmt.Println("We've done it.")
+	fmt.Println("\nWe've done it.")
 }
 
 func exclaimRandomly() {
@@ -592,9 +594,370 @@ func createSlideShow(story *Story) {
 			},
 		}...)
 	}
+	// Now append the final slide
+	updates.Requests = append(updates.Requests, getFinalSlide()...)
 
 	_, err := slidesService.Presentations.BatchUpdate(presentation.PresentationId, &updates).Do()
 	if err != nil {
 		panic(err)
 	}
+}
+
+func getFinalSlide() []*slides.Request {
+	// ctx := context.Background()
+	// client := getGoogleClient()
+	// slidesService, _ := slides.NewService(ctx, option.WithHTTPClient(client))
+
+	// presentation := &slides.Presentation{}
+	// presentation.Title = "Storybook Final Slide test"
+	// presentation.Layouts = []*slides.Page{
+	// 	{
+	// 		PageType: "LAYOUT",
+	// 	},
+	// }
+	// presentation, _ = slidesService.Presentations.Create(presentation).Do()
+	updates := slides.BatchUpdatePresentationRequest{}
+	updates.Requests = []*slides.Request{
+		{
+			CreateSlide: &slides.CreateSlideRequest{
+				ObjectId:       "finalSlide",
+				InsertionIndex: 0,
+				SlideLayoutReference: &slides.LayoutReference{
+					PredefinedLayout: "BLANK",
+				},
+			},
+		},
+		{
+			CreateImage: &slides.CreateImageRequest{
+				ObjectId: "finalImage",
+				Url:      FINAL_SLIDE_IMAGE,
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "finalSlide",
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.05,
+						ScaleY:     1.05,
+						TranslateX: 0.0,
+						TranslateY: 0.0,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		// I want this image to be transparent but its a readonly property in
+		// the API. WTF?!
+		// {
+		// 	UpdateImageProperties: &slides.UpdateImagePropertiesRequest{
+		// 		ObjectId: "finalImage",
+		// 		Fields:   "transparency",
+		// 		ImageProperties: &slides.ImageProperties{
+		// 			Transparency: 0.69,
+		// 		},
+		// 	},
+		// },
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  "madeWith",
+				ShapeType: "TEXT_BOX",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "finalSlide",
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 163.44, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 38.16, Unit: "PT"},
+					},
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.0,
+						ScaleY:     1.0,
+						TranslateX: 23.75,
+						TranslateY: 20.88,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: "madeWith",
+				Text:     "Made With",
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: "madeWith",
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Start",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: "madeWith",
+				Fields:   "bold,fontSize,fontFamily",
+				Style: &slides.TextStyle{
+					Bold:       false,
+					FontSize:   &slides.Dimension{Magnitude: 19, Unit: "PT"},
+					FontFamily: "Changa One",
+				},
+			},
+		},
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  "storyBook",
+				ShapeType: "TEXT_BOX",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "finalSlide",
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 543.6, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 130.32, Unit: "PT"},
+					},
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.0,
+						ScaleY:     1.0,
+						TranslateX: 0.0,
+						TranslateY: 41.01,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: "storyBook",
+				Text:     "Storybook",
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: "storyBook",
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Start",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: "storyBook",
+				Fields:   "bold,fontSize,fontFamily",
+				Style: &slides.TextStyle{
+					Bold:       true,
+					FontSize:   &slides.Dimension{Magnitude: 80, Unit: "PT"},
+					FontFamily: "Pacifico",
+				},
+			},
+		},
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  "howitworks",
+				ShapeType: "ROUND_RECTANGLE",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "finalSlide",
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 223.2, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 44.64, Unit: "PT"},
+					},
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.0,
+						ScaleY:     1.0,
+						TranslateX: 23.76,
+						TranslateY: 171.36,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			UpdateShapeProperties: &slides.UpdateShapePropertiesRequest{
+				ObjectId: "howitworks",
+				Fields:   "shapeBackgroundFill,link",
+				ShapeProperties: &slides.ShapeProperties{
+					Link: &slides.Link{
+						Url: "https://github.com/MATTALUI/storybook",
+					},
+					ShapeBackgroundFill: &slides.ShapeBackgroundFill{
+						SolidFill: &slides.SolidFill{
+							Alpha: 0.85,
+							Color: &slides.OpaqueColor{
+								RgbColor: &slides.RgbColor{
+									Red:   0.93,
+									Green: 0.93,
+									Blue:  0.93,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: "howitworks",
+				Text:     "How It Works",
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: "howitworks",
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Center",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: "howitworks",
+				Fields:   "bold,fontSize,fontFamily",
+				Style: &slides.TextStyle{
+					Bold:       false,
+					FontSize:   &slides.Dimension{Magnitude: 14, Unit: "PT"},
+					FontFamily: "Changa One",
+				},
+			},
+		},
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  "sourcelink",
+				ShapeType: "ROUND_RECTANGLE",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "finalSlide",
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 223.2, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 44.64, Unit: "PT"},
+					},
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.0,
+						ScaleY:     1.0,
+						TranslateX: 23.76,
+						TranslateY: 225.36,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			UpdateShapeProperties: &slides.UpdateShapePropertiesRequest{
+				ObjectId: "sourcelink",
+				Fields:   "shapeBackgroundFill,link",
+				ShapeProperties: &slides.ShapeProperties{
+					Link: &slides.Link{
+						Url: "https://github.com/MATTALUI/storybook",
+					},
+					ShapeBackgroundFill: &slides.ShapeBackgroundFill{
+						SolidFill: &slides.SolidFill{
+							Alpha: 0.85,
+							Color: &slides.OpaqueColor{
+								RgbColor: &slides.RgbColor{
+									Red:   0.93,
+									Green: 0.93,
+									Blue:  0.93,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: "sourcelink",
+				Text:     "Source",
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: "sourcelink",
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Center",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: "sourcelink",
+				Fields:   "bold,fontSize,fontFamily",
+				Style: &slides.TextStyle{
+					Bold:       false,
+					FontSize:   &slides.Dimension{Magnitude: 14, Unit: "PT"},
+					FontFamily: "Changa One",
+				},
+			},
+		},
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  "versionlink",
+				ShapeType: "ROUND_RECTANGLE",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "finalSlide",
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 223.2, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 44.64, Unit: "PT"},
+					},
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.0,
+						ScaleY:     1.0,
+						TranslateX: 23.76,
+						TranslateY: 279.36,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			UpdateShapeProperties: &slides.UpdateShapePropertiesRequest{
+				ObjectId: "versionlink",
+				Fields:   "shapeBackgroundFill,link",
+				ShapeProperties: &slides.ShapeProperties{
+					Link: &slides.Link{
+						Url: "https://github.com/MATTALUI/storybook",
+					},
+					ShapeBackgroundFill: &slides.ShapeBackgroundFill{
+						SolidFill: &slides.SolidFill{
+							Alpha: 0.85,
+							Color: &slides.OpaqueColor{
+								RgbColor: &slides.RgbColor{
+									Red:   0.93,
+									Green: 0.93,
+									Blue:  0.93,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: "versionlink",
+				Text:     "Version 0.1.0",
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: "versionlink",
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Center",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: "versionlink",
+				Fields:   "bold,fontSize,fontFamily",
+				Style: &slides.TextStyle{
+					Bold:       false,
+					FontSize:   &slides.Dimension{Magnitude: 14, Unit: "PT"},
+					FontFamily: "Changa One",
+				},
+			},
+		},
+	}
+	// _, err := slidesService.Presentations.BatchUpdate(presentation.PresentationId, &updates).Do()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	return updates.Requests
 }
