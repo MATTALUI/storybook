@@ -1,0 +1,5 @@
+.env
+storybook
+credentials.json
+images
+token.json
