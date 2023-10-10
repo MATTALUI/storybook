@@ -473,133 +473,136 @@ func createSlideShow(story *Story) {
 	updates := slides.BatchUpdatePresentationRequest{}
 	updates.Requests = make([]*slides.Request, 0)
 	for index, page := range story.Pages {
-		slideId := fmt.Sprintf("%d_SLIDE", index)
-		paragraphId := fmt.Sprintf("%d_PARAGRAPH", index)
-		imageId := fmt.Sprintf("%d_IMAGE", index)
-		updates.Requests = append(updates.Requests, []*slides.Request{
-			{
-				CreateSlide: &slides.CreateSlideRequest{
-					ObjectId: slideId,
-					SlideLayoutReference: &slides.LayoutReference{
-						PredefinedLayout: "BLANK",
-					},
-				},
-			},
-			{
-				CreateImage: &slides.CreateImageRequest{
-					ObjectId: imageId,
-					Url:      page.PublicImagePath,
-					// Url:      "https://picsum.photos/1344/768",
-					ElementProperties: &slides.PageElementProperties{
-						PageObjectId: slideId,
-						Transform: &slides.AffineTransform{
-							ScaleX:     1.05,
-							ScaleY:     1.05,
-							TranslateX: 0.0,
-							TranslateY: 0.0,
-							Unit:       "PT",
-						},
-					},
-				},
-			},
-			{
-				CreateShape: &slides.CreateShapeRequest{
-					ObjectId:  paragraphId,
-					ShapeType: "TEXT_BOX",
-					ElementProperties: &slides.PageElementProperties{
-						PageObjectId: slideId,
-						Size: &slides.Size{
-							Width:  &slides.Dimension{Magnitude: 269, Unit: "PT"},
-							Height: &slides.Dimension{Magnitude: 360, Unit: "PT"},
-						},
-						Transform: &slides.AffineTransform{
-							ScaleX:     1.0,
-							ScaleY:     1.0,
-							TranslateX: 15.0,
-							TranslateY: 15.0,
-							Unit:       "PT",
-						},
-					},
-				},
-			},
-			{
-				UpdateShapeProperties: &slides.UpdateShapePropertiesRequest{
-					ObjectId: paragraphId,
-					Fields:   "shapeBackgroundFill,outline,contentAlignment",
-					ShapeProperties: &slides.ShapeProperties{
-						ContentAlignment: "TOP",
-						Outline: &slides.Outline{
-							Weight:    &slides.Dimension{Magnitude: 1, Unit: "PT"},
-							DashStyle: "SOLID",
-							OutlineFill: &slides.OutlineFill{
-								SolidFill: &slides.SolidFill{
-									Color: &slides.OpaqueColor{
-										RgbColor: &slides.RgbColor{
-											Red:   0.35,
-											Green: 0.35,
-											Blue:  0.35,
-										},
-									},
-								},
-							},
-						},
-						ShapeBackgroundFill: &slides.ShapeBackgroundFill{
-							SolidFill: &slides.SolidFill{
-								Alpha: 0.69,
-								Color: &slides.OpaqueColor{
-									RgbColor: &slides.RgbColor{
-										Red:   0.37,
-										Green: 0.37,
-										Blue:  0.37,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			{
-				InsertText: &slides.InsertTextRequest{
-					ObjectId: paragraphId,
-					Text:     page.Paragraph,
-				},
-			},
-			{
-				UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
-					ObjectId: paragraphId,
-					Fields:   "alignment",
-					Style: &slides.ParagraphStyle{
-						Alignment: "Start",
-					},
-				},
-			},
-			{
-				UpdateTextStyle: &slides.UpdateTextStyleRequest{
-					ObjectId: paragraphId,
-					Fields:   "bold,fontSize,foregroundColor",
-					Style: &slides.TextStyle{
-						Bold:     true,
-						FontSize: &slides.Dimension{Magnitude: 13, Unit: "PT"},
-						ForegroundColor: &slides.OptionalColor{
-							OpaqueColor: &slides.OpaqueColor{
-								RgbColor: &slides.RgbColor{
-									Red:   1.0,
-									Green: 1.0,
-									Blue:  1.0,
-								},
-							},
-						},
-					},
-				},
-			},
-		}...)
+		updates.Requests = append(updates.Requests, buildPageSlideUpdates(index, &page)...)
 	}
-	// Now append the final slide
 	updates.Requests = append(updates.Requests, getFinalSlide()...)
 
 	_, err := slidesService.Presentations.BatchUpdate(presentation.PresentationId, &updates).Do()
 	if err != nil {
 		panic(err)
+	}
+}
+
+func buildPageSlideUpdates(index int, page *Page) []*slides.Request {
+	slideId := fmt.Sprintf("%d_SLIDE", index)
+	paragraphId := fmt.Sprintf("%d_PARAGRAPH", index)
+	imageId := fmt.Sprintf("%d_IMAGE", index)
+
+	return []*slides.Request{
+		{
+			CreateSlide: &slides.CreateSlideRequest{
+				ObjectId: slideId,
+				SlideLayoutReference: &slides.LayoutReference{
+					PredefinedLayout: "BLANK",
+				},
+			},
+		},
+		{
+			CreateImage: &slides.CreateImageRequest{
+				ObjectId: imageId,
+				Url:      page.PublicImagePath,
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: slideId,
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.05,
+						ScaleY:     1.05,
+						TranslateX: 0.0,
+						TranslateY: 0.0,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  paragraphId,
+				ShapeType: "TEXT_BOX",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: slideId,
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 269, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 360, Unit: "PT"},
+					},
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.0,
+						ScaleY:     1.0,
+						TranslateX: 15.0,
+						TranslateY: 15.0,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			UpdateShapeProperties: &slides.UpdateShapePropertiesRequest{
+				ObjectId: paragraphId,
+				Fields:   "shapeBackgroundFill,outline,contentAlignment",
+				ShapeProperties: &slides.ShapeProperties{
+					ContentAlignment: "TOP",
+					Outline: &slides.Outline{
+						Weight:    &slides.Dimension{Magnitude: 1, Unit: "PT"},
+						DashStyle: "SOLID",
+						OutlineFill: &slides.OutlineFill{
+							SolidFill: &slides.SolidFill{
+								Color: &slides.OpaqueColor{
+									RgbColor: &slides.RgbColor{
+										Red:   0.35,
+										Green: 0.35,
+										Blue:  0.35,
+									},
+								},
+							},
+						},
+					},
+					ShapeBackgroundFill: &slides.ShapeBackgroundFill{
+						SolidFill: &slides.SolidFill{
+							Alpha: 0.69,
+							Color: &slides.OpaqueColor{
+								RgbColor: &slides.RgbColor{
+									Red:   0.37,
+									Green: 0.37,
+									Blue:  0.37,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: paragraphId,
+				Text:     page.Paragraph,
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: paragraphId,
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Start",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: paragraphId,
+				Fields:   "bold,fontSize,foregroundColor",
+				Style: &slides.TextStyle{
+					Bold:     true,
+					FontSize: &slides.Dimension{Magnitude: 13, Unit: "PT"},
+					ForegroundColor: &slides.OptionalColor{
+						OpaqueColor: &slides.OpaqueColor{
+							RgbColor: &slides.RgbColor{
+								Red:   1.0,
+								Green: 1.0,
+								Blue:  1.0,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
