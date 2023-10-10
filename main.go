@@ -47,6 +47,8 @@ type Story struct {
 	Paragraphs     []string
 	RawGPTResponse string
 	Pages          []Page
+	Title          string
+	CoverImage     string
 }
 
 type StabilityTextPrompt struct {
@@ -481,6 +483,151 @@ func createSlideShow(story *Story) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func buildTitleSlideUpdates(story *Story) []*slides.Request {
+	// ctx := context.Background()
+	// client := getGoogleClient()
+	// slidesService, _ := slides.NewService(ctx, option.WithHTTPClient(client))
+
+	// presentation := &slides.Presentation{}
+	// presentation.Title = "Storybook Final Slide test"
+	// presentation.Layouts = []*slides.Page{
+	// 	{
+	// 		PageType: "LAYOUT",
+	// 	},
+	// }
+	// presentation, _ = slidesService.Presentations.Create(presentation).Do()
+	updates := slides.BatchUpdatePresentationRequest{}
+	updates.Requests = []*slides.Request{
+		{
+			CreateSlide: &slides.CreateSlideRequest{
+				ObjectId: "titleSlide",
+				SlideLayoutReference: &slides.LayoutReference{
+					PredefinedLayout: "BLANK",
+				},
+			},
+		},
+		{
+			DeleteObject: &slides.DeleteObjectRequest{
+				ObjectId: "p", // this is the title given to the default slide
+			},
+		},
+		{
+			CreateImage: &slides.CreateImageRequest{
+				ObjectId: "titlecoverimage",
+				Url:      story.CoverImage,
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "titleSlide",
+					Transform: &slides.AffineTransform{
+						ScaleX:     1.05,
+						ScaleY:     1.05,
+						TranslateX: 0.0,
+						TranslateY: 0.0,
+						Unit:       "PT",
+					},
+				},
+			},
+		},
+		{
+			CreateShape: &slides.CreateShapeRequest{
+				ObjectId:  "titlebackground",
+				ShapeType: "TEXT_BOX",
+				ElementProperties: &slides.PageElementProperties{
+					PageObjectId: "titleSlide",
+					Size: &slides.Size{
+						Width:  &slides.Dimension{Magnitude: 720, Unit: "PT"},
+						Height: &slides.Dimension{Magnitude: 405.64, Unit: "PT"},
+					},
+					// Transform: &slides.AffineTransform{
+					// 	ScaleX:     1.0,
+					// 	ScaleY:     1.0,
+					// 	TranslateX: 15.0,
+					// 	TranslateY: 15.0,
+					// 	Unit:       "PT",
+					// },
+				},
+			},
+		},
+		{
+			UpdateShapeProperties: &slides.UpdateShapePropertiesRequest{
+				ObjectId: "titlebackground",
+				Fields:   "shapeBackgroundFill,outline,contentAlignment",
+				ShapeProperties: &slides.ShapeProperties{
+					ContentAlignment: "Middle",
+					// Outline: &slides.Outline{
+					// 	Weight:    &slides.Dimension{Magnitude: 1, Unit: "PT"},
+					// 	DashStyle: "SOLID",
+					// 	OutlineFill: &slides.OutlineFill{
+					// 		SolidFill: &slides.SolidFill{
+					// 			Color: &slides.OpaqueColor{
+					// 				RgbColor: &slides.RgbColor{
+					// 					Red:   0.35,
+					// 					Green: 0.35,
+					// 					Blue:  0.35,
+					// 				},
+					// 			},
+					// 		},
+					// 	},
+					// },
+					ShapeBackgroundFill: &slides.ShapeBackgroundFill{
+						SolidFill: &slides.SolidFill{
+							Alpha: 0.5,
+							Color: &slides.OpaqueColor{
+								RgbColor: &slides.RgbColor{
+									Red:   0.37,
+									Green: 0.37,
+									Blue:  0.37,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId: "titlebackground",
+				Text:     story.Title,
+			},
+		},
+		{
+			UpdateParagraphStyle: &slides.UpdateParagraphStyleRequest{
+				ObjectId: "titlebackground",
+				Fields:   "alignment",
+				Style: &slides.ParagraphStyle{
+					Alignment: "Center",
+				},
+			},
+		},
+		{
+			UpdateTextStyle: &slides.UpdateTextStyleRequest{
+				ObjectId: "titlebackground",
+				Fields:   "bold,fontSize,foregroundColor,fontFamily",
+				Style: &slides.TextStyle{
+					Bold:       true,
+					FontSize:   &slides.Dimension{Magnitude: 80, Unit: "PT"},
+					FontFamily: "Pacifico",
+					ForegroundColor: &slides.OptionalColor{
+						OpaqueColor: &slides.OpaqueColor{
+							RgbColor: &slides.RgbColor{
+								Red:   1.0,
+								Green: 1.0,
+								Blue:  1.0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// _, err := slidesService.Presentations.BatchUpdate(presentation.PresentationId, &updates).Do()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	return updates.Requests
 }
 
 func buildPageSlideUpdates(index int, page *Page) []*slides.Request {
