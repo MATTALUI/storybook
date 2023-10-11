@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -111,6 +112,7 @@ func main() {
 	collectSynopsisFromUser(story)
 	getStoryFromGPT(story)
 	extractParagraphs(story)
+	buildCovers(story)
 
 	count := len(story.Paragraphs)
 	story.Pages = make([]Page, count)
@@ -150,6 +152,8 @@ func buildStory() *Story {
 	story := Story{
 		Id:         uuid.New(),
 		Paragraphs: make([]string, 0),
+		Title:      "Storybook Story",
+		CoverImage: FINAL_SLIDE_IMAGE,
 	}
 
 	return &story
@@ -190,6 +194,106 @@ func collectSynopsisFromUser(story *Story) {
 	story.Synopsis.Animal = animal
 	story.Synopsis.Name = name
 	story.Synopsis.Goal = goal
+}
+
+func buildCovers(story *Story) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go getTitle(story, &wg)
+	go getCoverImage(story, &wg)
+	wg.Wait()
+	fmt.Println("I think I've thought of a pretty good title")
+}
+
+func getTitle(story *Story, wg *sync.WaitGroup) {
+	template := `Give me a potential title for the following short story about %s,
+	a %s who is trying to %s.
+	Do not give me a title with a subtitle. Format your response the following way:
+	TITLE: "[title goes here]"
+	"%s"`
+	prompt := fmt.Sprintf(
+		template,
+		story.Synopsis.Name,
+		story.Synopsis.Animal,
+		story.Synopsis.Goal,
+		story.RawGPTResponse,
+	)
+	resp, err := getGPTResponse(prompt)
+	if err != nil {
+		if DEBUG {
+			panic(err)
+		}
+		fmt.Println("Screw it. I can't think of a title. No point in writing a story without a title")
+		os.Exit(1)
+	}
+	properlyFormatted, err := regexp.MatchString(`^title: ".*"$`, strings.ToLower(strings.TrimSpace(resp)))
+	if err != nil || !properlyFormatted {
+		if DEBUG {
+			fmt.Printf("properlyFormatted: %t\nresp: %s", properlyFormatted, resp)
+			panic(err)
+		}
+		fmt.Println("Eh. I've got a foggy brain right now. I can't work like this. Goodbye.")
+		os.Exit(1)
+	}
+	story.Title = strings.TrimSpace(strings.Split(resp, `"`)[1])
+	wg.Done()
+}
+
+func getCoverImage(story *Story, wg *sync.WaitGroup) {
+	template := `briefly describe a potential idea for the cover a childrens book about a %s named %s who is trying to %s`
+	prompt := fmt.Sprintf(
+		template,
+		story.Synopsis.Animal,
+		story.Synopsis.Name,
+		story.Synopsis.Goal,
+	)
+	coverBaseDescription, err := getGPTResponse(prompt)
+	if err != nil {
+		if DEBUG {
+			panic(err)
+		}
+		fmt.Println("I can't picture this anymore. Forget about it.")
+		os.Exit(1)
+	}
+	coverDescription := fmt.Sprintf("in the style of a watercolor childrens book. %s", coverBaseDescription)
+	results, err := getStabilityImages([]StabilityTextPrompt{
+		{Text: coverDescription, Weight: 1},
+		{Text: "writing words letters alphabet text", Weight: -1},
+	})
+	if err != nil {
+		if DEBUG {
+			panic(err)
+		}
+		fmt.Println("I messed up making the cover. It's worthless now.")
+		os.Exit(1)
+	}
+
+	// Should only ever really be 1 here
+	for _, result := range results.Artifacts {
+		os.MkdirAll(fmt.Sprintf("./images/%s", story.Id), os.ModePerm)
+		filePath := fmt.Sprintf("./images/%s/cover.png", story.Id)
+		imageBytes, _ := base64.StdEncoding.DecodeString(result.Base64Image)
+		f, _ := os.Create(filePath)
+		f.Write(imageBytes)
+		f.Close()
+		f, _ = os.Open(filePath)
+		uploader := getUploader()
+		upload, err := uploader.Upload(&s3manager.UploadInput{
+			Bucket: aws.String(S3_BUCKET_NAME),
+			Key:    aws.String(fmt.Sprintf("DOCTOR_SLIDES_%s_cover.png", story.Id)),
+			Body:   f,
+		})
+		if err != nil {
+			if DEBUG {
+				panic(err)
+			}
+			fmt.Println("You know, I am having trouble posting these images. Hrm. Try again later?")
+			os.Exit(1)
+		}
+		story.CoverImage = upload.Location
+	}
+
+	wg.Done()
 }
 
 func getStoryFromGPT(story *Story) {
@@ -242,7 +346,7 @@ func constructPage(index int, story *Story, wg *sync.WaitGroup) {
 	story.Pages[index] = newPage
 
 	buildPageDescriptors(index, story)
-	getStabilityImage(index, story)
+	getPageIllustration(index, story)
 	uploadPublicImage(index, story)
 	exclaimRandomly()
 
@@ -304,22 +408,16 @@ func buildPageDescriptors(index int, story *Story) {
 	newPage.ImageDescriptor = imageDescriptor
 }
 
-func getStabilityImage(index int, story *Story) {
-	// story.Pages[index].ImagePath = fmt.Sprintf("./images/f672b210-047a-482a-8237-a0078a0cbb09/%d.png", index)
-	// return
-	newPage := &story.Pages[index]
-
+func getStabilityImages(prompts []StabilityTextPrompt) (*StabilityResponseBody, error) {
 	postUrl := "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
 	bodyData := StabilityRequestBody{
-		Steps:    40,
-		Width:    1344,
-		Height:   768,
-		Seed:     0,
-		CFGScale: 10,
-		Samples:  1,
-		TextPrompts: []StabilityTextPrompt{
-			{Text: newPage.ImageDescriptor, Weight: 1},
-		},
+		Steps:       40,
+		Width:       1344,
+		Height:      768,
+		Seed:        0,
+		CFGScale:    10,
+		Samples:     1,
+		TextPrompts: prompts,
 	}
 	postBody, _ := json.Marshal(bodyData)
 	r, _ := http.NewRequest("POST", postUrl, bytes.NewBuffer(postBody))
@@ -330,11 +428,7 @@ func getStabilityImage(index int, story *Story) {
 	client := &http.Client{}
 	res, err := client.Do(r)
 	if err != nil {
-		if DEBUG {
-			panic(err)
-		}
-		fmt.Println("I can't work on this artwork right now. Maybe we should try again later.")
-		os.Exit(1)
+		return nil, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -347,8 +441,23 @@ func getStabilityImage(index int, story *Story) {
 		fmt.Println("I messed this painting up. Sorry.")
 		os.Exit(1)
 	}
-	results := StabilityResponseBody{}
-	err = json.NewDecoder(res.Body).Decode(&results)
+	results := &StabilityResponseBody{}
+	err = json.NewDecoder(res.Body).Decode(results)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func getPageIllustration(index int, story *Story) {
+	// story.Pages[index].ImagePath = fmt.Sprintf("./images/f672b210-047a-482a-8237-a0078a0cbb09/%d.png", index)
+	// return
+	newPage := &story.Pages[index]
+
+	results, err := getStabilityImages([]StabilityTextPrompt{
+		{Text: newPage.ImageDescriptor, Weight: 1},
+	})
 	if err != nil {
 		if DEBUG {
 			panic(err)
@@ -465,7 +574,7 @@ func createSlideShow(story *Story) {
 	slidesService, _ := slides.NewService(ctx, option.WithHTTPClient(client))
 
 	presentation := &slides.Presentation{}
-	presentation.Title = "Storybook Story"
+	presentation.Title = story.Title
 	presentation.Layouts = []*slides.Page{
 		{
 			PageType: "LAYOUT",
@@ -474,6 +583,7 @@ func createSlideShow(story *Story) {
 	presentation, _ = slidesService.Presentations.Create(presentation).Do()
 	updates := slides.BatchUpdatePresentationRequest{}
 	updates.Requests = make([]*slides.Request, 0)
+	updates.Requests = append(updates.Requests, buildTitleSlideUpdates(story)...)
 	for index, page := range story.Pages {
 		updates.Requests = append(updates.Requests, buildPageSlideUpdates(index, &page)...)
 	}
